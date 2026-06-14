@@ -172,12 +172,36 @@ FOR EACH ROW EXECUTE FUNCTION update_tweets_count();
 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  base_username TEXT;
+  final_username TEXT;
 BEGIN
-  INSERT INTO public.profiles (id, username, display_name)
+  base_username := CASE
+    WHEN NEW.email IS NOT NULL THEN
+      LOWER(REGEXP_REPLACE(SPLIT_PART(NEW.email, '@', 1), '[^a-z0-9_]', '', 'g'))
+    ELSE
+      'user'
+  END;
+  IF base_username = '' THEN base_username := 'user'; END IF;
+
+  -- UUID에서 하이픈을 제거한 앞 8자리로 고유 suffix 생성 (충돌 확률 1/4억)
+  final_username := base_username || '_' || SUBSTR(REPLACE(NEW.id::text, '-', ''), 1, 8);
+
+  INSERT INTO public.profiles (id, username, display_name, avatar_url)
   VALUES (
     NEW.id,
-    LOWER(SPLIT_PART(NEW.email, '@', 1)) || '_' || SUBSTR(NEW.id::text, 1, 6),
-    COALESCE(NEW.raw_user_meta_data->>'display_name', SPLIT_PART(NEW.email, '@', 1))
+    final_username,
+    COALESCE(
+      NEW.raw_user_meta_data->>'full_name',
+      NEW.raw_user_meta_data->>'name',
+      NEW.raw_user_meta_data->>'display_name',
+      SPLIT_PART(COALESCE(NEW.email, 'user'), '@', 1)
+    ),
+    COALESCE(
+      NEW.raw_user_meta_data->>'avatar_url',
+      NEW.raw_user_meta_data->>'picture',
+      ''
+    )
   );
   RETURN NEW;
 END;

@@ -9,6 +9,7 @@ import { Home } from './pages/Home'
 import { Profile } from './pages/Profile'
 import { TweetDetail } from './pages/TweetDetail'
 import { Search } from './pages/Search'
+import { Notifications } from './pages/Notifications'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuthStore()
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
         <Route path="/profile/:username" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/tweet/:id" element={<ProtectedRoute><TweetDetail /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

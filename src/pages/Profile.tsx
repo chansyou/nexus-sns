@@ -9,6 +9,7 @@ import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import type { Profile as ProfileType, Tweet } from '../types'
+import { FollowListModal } from '../components/ui/FollowListModal'
 import toast from 'react-hot-toast'
 
 export function Profile() {
@@ -23,6 +24,7 @@ export function Profile() {
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({ display_name: '', bio: '' })
   const [isSaving, setIsSaving] = useState(false)
+  const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
 
@@ -135,11 +137,12 @@ export function Profile() {
       const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
       if (uploadError) throw uploadError
       const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      const avatarUrl = `${data.publicUrl}?t=${Date.now()}`
       const { error: updateError } = await supabase
-        .from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id)
+        .from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id)
       if (updateError) throw updateError
       await fetchProfile(user.id)
-      setProfile((prev) => prev ? { ...prev, avatar_url: data.publicUrl } : prev)
+      setProfile((prev) => prev ? { ...prev, avatar_url: avatarUrl } : prev)
       toast.success('프로필 사진이 변경되었습니다')
     } catch {
       toast.error('업로드에 실패했습니다')
@@ -156,10 +159,11 @@ export function Profile() {
       const { error: uploadError } = await supabase.storage.from('covers').upload(path, file, { upsert: true })
       if (uploadError) throw uploadError
       const { data } = supabase.storage.from('covers').getPublicUrl(path)
+      const coverUrl = `${data.publicUrl}?t=${Date.now()}`
       const { error: updateError } = await supabase
-        .from('profiles').update({ cover_url: data.publicUrl }).eq('id', user.id)
+        .from('profiles').update({ cover_url: coverUrl }).eq('id', user.id)
       if (updateError) throw updateError
-      setProfile((prev) => prev ? { ...prev, cover_url: data.publicUrl } : prev)
+      setProfile((prev) => prev ? { ...prev, cover_url: coverUrl } : prev)
       toast.success('커버 이미지가 변경되었습니다')
     } catch {
       toast.error('업로드에 실패했습니다')
@@ -283,14 +287,20 @@ export function Profile() {
               <p className="text-gray-500 text-sm">@{profile.username}</p>
               {profile.bio && <p className="mt-2 text-gray-700 dark:text-gray-300 text-sm">{profile.bio}</p>}
               <div className="flex gap-4 mt-3 text-sm">
-                <span className="text-gray-900 dark:text-white">
+                <button
+                  onClick={() => setFollowModal('following')}
+                  className="text-gray-900 dark:text-white hover:underline"
+                >
                   <strong>{profile.following_count}</strong>{' '}
                   <span className="text-gray-500">팔로잉</span>
-                </span>
-                <span className="text-gray-900 dark:text-white">
+                </button>
+                <button
+                  onClick={() => setFollowModal('followers')}
+                  className="text-gray-900 dark:text-white hover:underline"
+                >
                   <strong>{profile.followers_count}</strong>{' '}
                   <span className="text-gray-500">팔로워</span>
-                </span>
+                </button>
               </div>
             </>
           )}
@@ -304,6 +314,14 @@ export function Profile() {
           emptyMessage="아직 트윗이 없습니다"
         />
       </div>
+
+      {followModal && profile && (
+        <FollowListModal
+          profileId={profile.id}
+          type={followModal}
+          onClose={() => setFollowModal(null)}
+        />
+      )}
     </MainLayout>
   )
 }
