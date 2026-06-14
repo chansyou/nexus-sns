@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Heart, MessageCircle, Trash2 } from 'lucide-react'
+import { Heart, MessageCircle, Trash2, Pencil, X, Check } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import type { Tweet } from '../../types'
@@ -12,16 +12,23 @@ import toast from 'react-hot-toast'
 interface TweetCardProps {
   tweet: Tweet
   onDelete?: (id: string) => void
+  onEdit?: (id: string, content: string) => void
   onLikeToggle?: (id: string, liked: boolean) => void
   isDetail?: boolean
 }
 
-export function TweetCard({ tweet, onDelete, onLikeToggle, isDetail = false }: TweetCardProps) {
+export function TweetCard({ tweet, onDelete, onEdit, onLikeToggle, isDetail = false }: TweetCardProps) {
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const [isLiked, setIsLiked] = useState(tweet.is_liked ?? false)
   const [likesCount, setLikesCount] = useState(tweet.likes_count)
   const [isLikeLoading, setIsLikeLoading] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState(tweet.content)
+  const [displayContent, setDisplayContent] = useState(tweet.content)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+
+  const isOwn = user?.id === tweet.user_id
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -64,6 +71,35 @@ export function TweetCard({ tweet, onDelete, onLikeToggle, isDetail = false }: T
     }
   }
 
+  const handleEditSave = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const trimmed = editContent.trim()
+    if (!trimmed) { toast.error('내용을 입력해주세요'); return }
+    if (trimmed === displayContent) { setIsEditing(false); return }
+    if (trimmed.length > 280) { toast.error('280자를 초과할 수 없습니다'); return }
+
+    setIsSavingEdit(true)
+    try {
+      const { error } = await supabase.from('tweets').update({ content: trimmed }).eq('id', tweet.id)
+      if (error) throw error
+      setDisplayContent(trimmed)
+      setEditContent(trimmed)
+      onEdit?.(tweet.id, trimmed)
+      setIsEditing(false)
+      toast.success('수정되었습니다')
+    } catch {
+      toast.error('수정에 실패했습니다')
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  const handleEditCancel = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditContent(displayContent)
+    setIsEditing(false)
+  }
+
   const timeAgo = formatDistanceToNow(new Date(tweet.created_at), { addSuffix: true, locale: ko })
 
   const cardContent = (
@@ -85,19 +121,61 @@ export function TweetCard({ tweet, onDelete, onLikeToggle, isDetail = false }: T
           <span className="text-gray-400 text-sm">·</span>
           <span className="text-gray-400 text-sm">{timeAgo}</span>
 
-          {user?.id === tweet.user_id && (
-            <button
-              onClick={handleDelete}
-              className="ml-auto p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
-            >
-              <Trash2 size={14} />
-            </button>
+          {isOwn && !isEditing && (
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsEditing(true) }}
+                className="p-1 text-gray-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-full transition-colors"
+                title="수정"
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                onClick={handleDelete}
+                className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                title="삭제"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          )}
+
+          {isOwn && isEditing && (
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                onClick={handleEditSave}
+                disabled={isSavingEdit}
+                className="p-1 text-gray-400 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-full transition-colors disabled:opacity-50"
+                title="저장"
+              >
+                <Check size={13} />
+              </button>
+              <button
+                onClick={handleEditCancel}
+                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                title="취소"
+              >
+                <X size={13} />
+              </button>
+            </div>
           )}
         </div>
 
-        <p className="text-gray-900 dark:text-white text-sm mt-1 whitespace-pre-wrap break-words">
-          {tweet.content}
-        </p>
+        {isEditing ? (
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            rows={3}
+            maxLength={280}
+            autoFocus
+            className="mt-1 w-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-2 border border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+          />
+        ) : (
+          <p className="text-gray-900 dark:text-white text-sm mt-1 whitespace-pre-wrap break-words">
+            {displayContent}
+          </p>
+        )}
 
         {tweet.image_url && (
           <img
@@ -137,7 +215,7 @@ export function TweetCard({ tweet, onDelete, onLikeToggle, isDetail = false }: T
   return (
     <div
       className="border-b border-gray-200 dark:border-gray-800"
-      onClick={() => navigate(`/tweet/${tweet.id}`)}
+      onClick={() => !isEditing && navigate(`/tweet/${tweet.id}`)}
     >
       {cardContent}
     </div>

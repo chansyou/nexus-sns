@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, User, LogOut, Bell, Search } from 'lucide-react'
+import { Home, User, LogOut, Bell, Search, Sun, Moon } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
+import { useTheme } from '../../hooks/useTheme'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import toast from 'react-hot-toast'
@@ -13,6 +14,7 @@ const navItems = [
 
 export function Sidebar() {
   const { user, signOut } = useAuthStore()
+  const { isDark, toggle } = useTheme()
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
@@ -61,6 +63,14 @@ export function Sidebar() {
             <span className="hidden xl:block">프로필</span>
           </NavLink>
         )}
+
+        <button
+          onClick={toggle}
+          className="w-full flex items-center gap-4 px-3 py-3 rounded-full transition-colors text-xl font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+        >
+          {isDark ? <Sun size={24} /> : <Moon size={24} />}
+          <span className="hidden xl:block">{isDark ? '라이트 모드' : '다크 모드'}</span>
+        </button>
       </nav>
 
       {user && (
